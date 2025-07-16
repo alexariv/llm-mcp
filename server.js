@@ -1,69 +1,3 @@
-/* require('dotenv').config();
-console.log('ES_URL:', process.env.ES_URL);
-console.log('ES_API_KEY:', process.env.ES_API_KEY);
-
-const express = require('express');
-const bodyParser = require('body-parser');
-const { spawn } = require('child_process');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(bodyParser.json());
-
-app.post('/elasticsearch/search', async (req, res) => {
-  const mcpInput = JSON.stringify(req.body) + '\n';
-
-  const proc = spawn('mcp-server-elasticsearch', [], {
-  env: {
-    ...process.env,
-    ES_URL: process.env.ES_URL,
-    ES_API_KEY: process.env.ES_API_KEY,
-    OTEL_LOG_LEVEL: process.env.OTEL_LOG_LEVEL || 'none'
-  }
-});
-
-  let stdout = '';
-  let stderr = '';
-
-  proc.stdout.on('data', (data) => {
-    stdout += data.toString();
-  });
-
-  proc.stderr.on('data', (data) => {
-    stderr += data.toString();
-  });
-
-  proc.stdin.write(mcpInput);
-  proc.stdin.end();
-
-  proc.on('close', (code) => {
-    console.log('STDOUT:', stdout);
-    console.log('STDERR:', stderr);
-
-    if (code !== 0) {
-      return res.status(500).json({ error: stderr || 'Error in MCP tool' });
-    }
-    try {
-      const json = JSON.parse(stdout);
-      res.json(json);
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to parse MCP response' });
-    }
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Elasticsearch MCP microservice running on port ${PORT}`);
-}); */
-process.on('uncaughtException', err => {
-  console.error('[UNCAUGHT EXCEPTION]', err);
-});
-
-process.on('unhandledRejection', reason => {
-  console.error('[UNHANDLED REJECTION]', reason);
-});
-
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -78,7 +12,7 @@ app.post('/elasticsearch/search', async (req, res) => {
   console.log('[INFO] Received /elasticsearch/search request');
   const mcpInput = JSON.stringify(req.body) + '\n';
 
-  // --- Spawn MCP Server ---
+  //Spawn MCP Server (Elasticsearch)
   console.log('[INFO] Spawning MCP server...');
   const mcpServer = spawn('mcp-server-elasticsearch', [], {
     env: {
@@ -86,18 +20,18 @@ app.post('/elasticsearch/search', async (req, res) => {
       ES_URL: process.env.ES_URL,
       ES_API_KEY: process.env.ES_API_KEY,
       OTEL_LOG_LEVEL: process.env.OTEL_LOG_LEVEL || 'debug'
-    },
-    stdio: ['pipe', 'pipe', 'pipe']
+      },
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    mcpServer.stderr.on('data', (data) => {
+    console.error('[MCP SERVER STDERR]', data.toString());
   });
-  mcpServer.stderr.on('data', (data) => {
-  console.error('[MCP SERVER STDERR]', data.toString());
-});
-  mcpServer.on('error', (err) => {
-  console.error('[ERROR] Failed to start MCP server:', err);
-});
+    mcpServer.on('error', (err) => {
+    console.error('[ERROR] Failed to start MCP server:', err);
+  });
 
 
-  // --- Spawn MCP Client (Ollama) ---
+  // Spawn MCP Client (Ollama)
 
 let mcpClient;
 try {
@@ -126,14 +60,14 @@ try {
 
 
 
-  // --- Wire MCP Client <--> Server ---
+  // Wire MCP Client to Server
   mcpServer.stdout.pipe(mcpClient.stdin);
   mcpClient.stdout.pipe(mcpServer.stdin);
-  // --- Send the input once ---
+  // Send the input once
   mcpServer.stdin.write(mcpInput);
   mcpServer.stdin.end();
 
-  // --- Capture MCP Server Output to return to HTTP client ---
+  // Capture MCP Server Output to return to HTTP client 
   let stdout = '';
   let stderr = '';
 
@@ -145,7 +79,7 @@ try {
     stderr += data.toString();
   });
 
-  // --- Send MCP input to the server ---
+  //Send MCP input to the server
   mcpServer.stdin.write(mcpInput);
   mcpServer.stdin.end();
 
@@ -167,6 +101,6 @@ try {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Elasticsearch MCP microservice running on port ${PORT}`);
+  console.log(`Elasticsearch MCP microservice running on port ${PORT}`);
 });
 
